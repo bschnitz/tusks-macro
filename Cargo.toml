@@ -1,6 +1,6 @@
 [package]
-name = "tusks"
-version = "0.1.0"
+name = "tusks-macro"
+version = "0.2.0"
 edition = "2024"
 
 [lib]
@@ -10,3 +10,4 @@ proc-macro = true
 proc-macro2 = "1.0.101"
 quote = "1.0.41"
 syn = { version = "2.0.107", features = ["full"] }
+tusks-lib = { path = "../tusks-lib" }
