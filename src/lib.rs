@@ -9,7 +9,7 @@ use tusks_lib::TusksNode;
 pub fn tusks(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut module = parse_macro_input!(item as ItemMod);
     
-    let tusks_tree = match TusksNode::from_module(&module) {
+    let tusks_tree = match TusksNode::from_module(&module, Vec::new()) {
         Ok(tree) => tree,
         Err(err) => return err.to_compile_error().into(),
     };
@@ -32,8 +32,9 @@ pub fn tusks(_attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 fn create_internal_tusks_module(tusks_tree: &TusksNode) -> TokenStream2 {
-    let tree_code = tusks_tree.to_tokens(&[]); // Start mit leerem Pfad
+    let tree_code = tusks_tree.to_tokens(&[]);
     let mirror_code = tusks_tree.create_mirror(&[]);
+    let cli_build_code = tusks_tree.build_cli("command", "path_prefix", "path_sep");
     
     quote! {
         pub mod __tusks_internal_module {
@@ -46,6 +47,22 @@ fn create_internal_tusks_module(tusks_tree: &TusksNode) -> TokenStream2 {
             
             pub mod mirror_module {
                 #mirror_code
+            }
+            
+            pub fn execute_cli(path_sep: String) {
+                let mut command = clap::Command::new("tusks")
+                    .version("1.0")
+                    .about("Task runner");
+                
+                command = build_cli(command, Vec::new(), path_sep);
+                
+                // TODO: Execute the CLI and handle matches
+                let _matches = command.get_matches();
+            }
+            
+            pub fn build_cli(mut command: clap::Command, path_prefix: Vec<String>, path_sep: String) -> clap::Command {
+                #cli_build_code
+                command
             }
         }
     }
