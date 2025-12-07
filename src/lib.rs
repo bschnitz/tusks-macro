@@ -56,6 +56,7 @@ fn create_internal_tusks_module(tusks_tree: &TusksNode, path_separator: &str) ->
     let tree_code = tusks_tree.to_tokens(&[]);
     let mirror_code = tusks_tree.create_mirror(&[]);
     let cli_build_code = tusks_tree.build_cli("command", "path_prefix", path_separator);
+    let handle_matches_code = tusks_tree.build_handle_matches(path_separator);
     
     quote! {
         pub mod __tusks_internal_module {
@@ -77,14 +78,16 @@ fn create_internal_tusks_module(tusks_tree: &TusksNode, path_separator: &str) ->
                 
                 command = build_cli(command, Vec::new());
                 
-                // TODO: Execute the CLI and handle matches
-                let _matches = command.get_matches();
+                let matches = command.get_matches();
+                handle_matches(&matches, Vec::new());
             }
             
             pub fn build_cli(mut command: clap::Command, path_prefix: Vec<String>) -> clap::Command {
                 #cli_build_code
                 command
             }
+            
+            #handle_matches_code
         }
     }
 }
