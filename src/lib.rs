@@ -1,4 +1,5 @@
 use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{ItemMod, parse_macro_input};
 
@@ -6,21 +7,24 @@ use tusks_lib::TusksNode;
 
 #[proc_macro_attribute]
 pub fn tusks(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    // Parse das Modul
     let mut module = parse_macro_input!(item as ItemMod);
     
-    // Erstelle den TusksNode-Baum (vor dem Cleanup)
     let tusks_tree = match TusksNode::from_module(&module) {
         Ok(tree) => tree,
         Err(err) => return err.to_compile_error().into(),
     };
     
-    // Debug-Ausgabe zur Compile-Zeit
+    // Debug output at compile time
     eprintln!("Tusks Tree: {:#?}", tusks_tree);
     
-    // Entferne alle #[defaults(...)] Attribute nach dem Parsen
+    // Remove all #[defaults(...)] attributes after parsing
     if let Some((_, items)) = &mut module.content {
         cleanup_defaults_attributes(items);
+        
+        // Add the internal module to the module's items
+        let internal_module = create_internal_tusks_module(&tusks_tree);
+        let internal_item: syn::Item = syn::parse2(internal_module).expect("Failed to parse internal module");
+        items.push(internal_item);
     }
     
     let expanded = quote! {
@@ -30,16 +34,31 @@ pub fn tusks(_attr: TokenStream, item: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-/// Entfernt rekursiv alle #[defaults(...)] Attribute aus dem Modul
+fn create_internal_tusks_module(tusks_tree: &TusksNode) -> TokenStream2 {
+    let tree_code = tusks_tree.to_tokens(&[]); // Start mit leerem Pfad
+    
+    quote! {
+        pub mod __tusks_internal_module {
+            use tusks::{TusksNode, Tusk, Argument, LinkNode};
+            use std::collections::HashMap;
+            
+            pub fn get_tusks_tree() -> TusksNode {
+                #tree_code
+            }
+        }
+    }
+}
+
+/// Recursively removes all #[defaults(...)] attributes from the module
 fn cleanup_defaults_attributes(items: &mut Vec<syn::Item>) {
     for item in items.iter_mut() {
         match item {
             syn::Item::Fn(func) => {
-                // Entferne defaults-Attribute von Funktionen
+                // Remove defaults attributes from functions
                 remove_defaults_attrs(&mut func.attrs);
             }
             syn::Item::Mod(submodule) => {
-                // Rekursiv in Submodule gehen
+                // Recurse into submodules
                 if let Some((_, subitems)) = &mut submodule.content {
                     cleanup_defaults_attributes(subitems);
                 }
@@ -49,10 +68,10 @@ fn cleanup_defaults_attributes(items: &mut Vec<syn::Item>) {
     }
 }
 
-/// Entfernt alle #[defaults(...)] Attribute aus einer Attribut-Liste
+/// Removes all #[defaults(...)] attributes from an attribute list
 fn remove_defaults_attrs(attrs: &mut Vec<syn::Attribute>) {
     attrs.retain(|attr| {
-        // Behalte nur Attribute, die NICHT "defaults" sind
+        // Keep only attributes that are NOT "defaults"
         !attr.path().is_ident("defaults")
     });
 }
