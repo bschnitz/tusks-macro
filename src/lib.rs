@@ -14,9 +14,6 @@ pub fn tusks(_attr: TokenStream, item: TokenStream) -> TokenStream {
         Err(err) => return err.to_compile_error().into(),
     };
     
-    // Debug output at compile time
-    eprintln!("Tusks Tree: {:#?}", tusks_tree);
-    
     // Remove all #[defaults(...)] attributes after parsing
     if let Some((_, items)) = &mut module.content {
         cleanup_defaults_attributes(items);
@@ -36,6 +33,7 @@ pub fn tusks(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
 fn create_internal_tusks_module(tusks_tree: &TusksNode) -> TokenStream2 {
     let tree_code = tusks_tree.to_tokens(&[]); // Start mit leerem Pfad
+    let mirror_code = tusks_tree.create_mirror(&[]);
     
     quote! {
         pub mod __tusks_internal_module {
@@ -44,6 +42,10 @@ fn create_internal_tusks_module(tusks_tree: &TusksNode) -> TokenStream2 {
             
             pub fn get_tusks_tree() -> TusksNode {
                 #tree_code
+            }
+            
+            pub mod mirror_module {
+                #mirror_code
             }
         }
     }
