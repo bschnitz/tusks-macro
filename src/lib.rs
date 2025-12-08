@@ -54,7 +54,7 @@ fn parse_path_separator(attr: TokenStream) -> String {
 
 fn create_internal_tusks_module(tusks_tree: &TusksNode, path_separator: &str) -> TokenStream2 {
     let tree_code = tusks_tree.to_tokens(&[]);
-    let mirror_code = tusks_tree.create_mirror(&[]);
+    //let mirror_code = tusks_tree.create_mirror(&[]);
     let cli_build_code = tusks_tree.build_cli("command", "path_prefix", path_separator);
     let handle_matches_code = tusks_tree.build_handle_matches(path_separator);
 
@@ -68,7 +68,7 @@ fn create_internal_tusks_module(tusks_tree: &TusksNode, path_separator: &str) ->
             }
 
             pub mod mirror_module {
-                #mirror_code
+                //#mirror_code
             }
 
             pub fn execute_cli() {
@@ -98,7 +98,7 @@ fn cleanup_defaults_attributes(items: &mut Vec<syn::Item>) {
         match item {
             syn::Item::Fn(func) => {
                 // Remove defaults attributes from functions
-                remove_defaults_attrs(&mut func.attrs);
+                remove_undefined_attributes(&mut func.attrs);
             }
             syn::Item::Mod(submodule) => {
                 // Recurse into submodules
@@ -111,10 +111,10 @@ fn cleanup_defaults_attributes(items: &mut Vec<syn::Item>) {
     }
 }
 
-/// Removes all #[defaults(...)] attributes from an attribute list
-fn remove_defaults_attrs(attrs: &mut Vec<syn::Attribute>) {
+/// Removes all #[defaults(...)] and #[positional(...)] attributes from an attribute list
+fn remove_undefined_attributes(attrs: &mut Vec<syn::Attribute>) {
     attrs.retain(|attr| {
-        // Keep only attributes that are NOT "defaults"
-        !attr.path().is_ident("defaults")
+        // Keep only attributes that are neither "defaults" nor "positional"
+        !attr.path().is_ident("defaults") && !attr.path().is_ident("positional")
     });
 }
