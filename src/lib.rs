@@ -80,7 +80,9 @@ pub fn tusks(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // 1. Validate that it's called on a module
     let mut module = parse_macro_input!(item as ItemMod);
 
-    let args = parse_macro_input!(_attr as TusksAttr);
+    let mut args = parse_macro_input!(_attr as TusksAttr);
+
+    args.debug = args.debug || cfg!(feature = "debug");
     
     // 2. Parse with TusksModule::from_module
     let mut tusks_module = match TusksModule::from_module(module.clone(), args.root, true) {
@@ -99,7 +101,7 @@ pub fn tusks(_attr: TokenStream, item: TokenStream) -> TokenStream {
     }
     
     // 3. Clean the original module from #[arg] and #[parameters] attributes
-    let cleaned_module = clean_module_attributes(module);
+    let cleaned_module = clean_attributes_from_module(module);
     
     // 4. Insert __internal_tusks_module with cli
     let extended_module = insert_internal_module(cleaned_module, &tusks_module, &args);
@@ -115,10 +117,11 @@ pub fn tusks(_attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 /// Remove #[arg] and #[parameters] attributes from a module and all its items
-fn clean_module_attributes(mut module: ItemMod) -> ItemMod {
+fn clean_attributes_from_module(mut module: ItemMod) -> ItemMod {
     // Don't clean module-level attributes
     
     // Clean attributes in module content
+    clean_module_attributes(&mut module);
     if let Some((brace, ref mut items)) = module.content {
         for item in items.iter_mut() {
             clean_item_attributes(item);
@@ -129,6 +132,15 @@ fn clean_module_attributes(mut module: ItemMod) -> ItemMod {
     module
 }
 
+fn clean_module_attributes(module: &mut ItemMod) {
+    module.attrs.retain(
+        |attr|
+            !attr.path().is_ident("command")
+            && !attr.path().is_ident("subcommands")
+            && !attr.path().is_ident("external_subcommands")
+    );
+}
+
 /// Recursively clean attributes from an item
 fn clean_item_attributes(item: &mut syn::Item) {
     match item {
@@ -137,9 +149,6 @@ fn clean_item_attributes(item: &mut syn::Item) {
                 s.attrs.retain(|attr| !attr.path().is_ident("skip"));
             }
             else {
-                // Clean #[parameters] from struct
-                s.attrs.retain(|attr| !attr.path().is_ident("parameters"));
-
                 // Clean #[arg] from field attributes
                 for field in s.fields.iter_mut() {
                     field.attrs.retain(|attr| !attr.path().is_ident("arg"));
@@ -151,6 +160,8 @@ fn clean_item_attributes(item: &mut syn::Item) {
                 f.attrs.retain(|attr| !attr.path().is_ident("skip"));
             }
             else {
+                f.attrs.retain(|attr| !attr.path().is_ident("command"));
+
                 // Clean #[arg] from parameter attributes
                 for input in f.sig.inputs.iter_mut() {
                     if let syn::FnArg::Typed(pat_type) = input {
@@ -164,6 +175,8 @@ fn clean_item_attributes(item: &mut syn::Item) {
                 m.attrs.retain(|attr| !attr.path().is_ident("skip"));
             }
             else {
+                clean_module_attributes(m);
+
                 // Recursively clean submodules
                 if let Some((brace, ref mut items)) = m.content {
                     for subitem in items.iter_mut() {
@@ -171,6 +184,14 @@ fn clean_item_attributes(item: &mut syn::Item) {
                     }
                     m.content = Some((brace, items.clone()));
                 }
+            }
+        }
+        syn::Item::Use(u) => {
+            if u.has_attr("skip") {
+                u.attrs.retain(|attr| !attr.path().is_ident("skip"));
+            }
+            else {
+                u.attrs.retain(|attr| !attr.path().is_ident("command"));
             }
         }
         _ => {
