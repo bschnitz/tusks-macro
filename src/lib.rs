@@ -213,11 +213,11 @@ fn insert_internal_module(
     let exec_cli = match attr.root {
         false => quote! {},
         true => quote! {
-            pub fn exec_cli() {
+            pub fn exec_cli() -> Option<u8> {
                 use tusks::clap::Parser;
 
                 let cli = cli::Cli::parse();
-                handle_matches(&cli);
+                handle_matches(&cli)
             }
         }
     };
@@ -245,6 +245,22 @@ fn insert_internal_module(
     // Add it to the module content
     if let Some((brace, ref mut items)) = module.content {
         items.push(internal_item);
+
+
+        if attr.root {
+            let exec_cli_outer = quote! {
+                pub fn exec_cli() -> Option<u8> {
+                    __internal_tusks_module::exec_cli()
+                }
+            };
+
+            let exec_cli_outer: syn::Item = syn::parse2(exec_cli_outer)
+                .expect("Failed to parse outer exec cli");
+
+            items.push(exec_cli_outer);
+        }
+
+
         module.content = Some((brace, items.clone()));
     }
     
