@@ -160,7 +160,10 @@ fn clean_item_attributes(item: &mut syn::Item) {
                 f.attrs.retain(|attr| !attr.path().is_ident("skip"));
             }
             else {
-                f.attrs.retain(|attr| !attr.path().is_ident("command"));
+                f.attrs.retain(
+                    |attr| !attr.path().is_ident("command")
+                    && !attr.path().is_ident("default")
+                );
 
                 // Clean #[arg] from parameter attributes
                 for input in f.sig.inputs.iter_mut() {
