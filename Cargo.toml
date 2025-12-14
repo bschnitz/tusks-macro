@@ -1,16 +1,19 @@
 [package]
 name = "tusks-macro"
-version = "1.2.2"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description.workspace = true
 
 [lib]
 proc-macro = true
 
 [dependencies]
-proc-macro2 = "1.0.101"
-quote = "1.0.41"
-syn = { version = "2.0.107", features = ["full"] }
-tusks-lib = { path = "../tusks-lib" }
+proc-macro2.workspace = true
+quote.workspace = true
+syn = { workspace = true, features = ["full"] }
+tusks-lib.workspace = true
 
 [features]
 debug = []
