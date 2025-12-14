@@ -1,79 +1,13 @@
 use proc_macro::TokenStream;
-use syn::Ident;
-use syn::parse::Parse;
-use syn::{parse_macro_input, ItemMod, parse::ParseStream, LitBool, Token};
+use syn::{parse_macro_input, ItemMod};
 use quote::quote;
 use tusks_lib::TusksModule;
 use tusks_lib::AttributeCheck;
-
-
-struct TusksAttr {
-    debug: bool,
-    root: bool,
-    derive_debug_for_parameters: bool
-}
-
-impl Parse for TusksAttr {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut debug = false;
-        let mut root = false;
-        let mut derive_debug_for_parameters = false;
-        
-        // Parse comma-separated list of attributes
-        while !input.is_empty() {
-            let ident: Ident = input.parse()?;
-            
-            match ident.to_string().as_str() {
-                "debug" => {
-                    // Check if followed by = true/false
-                    if input.peek(Token![=]) {
-                        input.parse::<Token![=]>()?;
-                        let value: LitBool = input.parse()?;
-                        debug = value.value;
-                    } else {
-                        // Just "debug" means true
-                        debug = true;
-                    }
-                }
-                "root" => {
-                    // Check if followed by = true/false
-                    if input.peek(Token![=]) {
-                        input.parse::<Token![=]>()?;
-                        let value: LitBool = input.parse()?;
-                        root = value.value;
-                    } else {
-                        // Just "root" means true
-                        root = true;
-                    }
-                }
-                "derive_debug_for_parameters" => {
-                    // Check if followed by = true/false
-                    if input.peek(Token![=]) {
-                        input.parse::<Token![=]>()?;
-                        let value: LitBool = input.parse()?;
-                        derive_debug_for_parameters = value.value;
-                    } else {
-                        // Just "derive_debug_for_parameters" means true
-                        root = true;
-                    }
-                }
-                other => {
-                    return Err(syn::Error::new(
-                        ident.span(),
-                        format!("unknown tusks attribute: {}", other)
-                    ));
-                }
-            }
-            
-            // Parse comma if not at end
-            if !input.is_empty() {
-                input.parse::<Token![,]>()?;
-            }
-        }
-        
-        Ok(TusksAttr { debug, root, derive_debug_for_parameters })
-    }
-}
+use tusks_lib::AttributeValue;
+use tusks_lib::attribute::models::TusksAttr;
+use tusks_lib::tasks::functions::add_execute_task_function;
+use tusks_lib::tasks::functions::add_show_help_for_task;
+use tusks_lib::tasks::functions::set_allow_external_subcommands;
 
 #[proc_macro_attribute]
 pub fn tusks(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -81,6 +15,18 @@ pub fn tusks(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut module = parse_macro_input!(item as ItemMod);
 
     let mut args = parse_macro_input!(_attr as TusksAttr);
+
+    // if tasks configuration exists add necessary functions
+    if let Some(tasks_config) = &args.tasks {
+        set_allow_external_subcommands(&mut module);
+        let allow_external_subcommands = module.get_attribute_bool(
+            "command",
+            "allow_external_subcommands"
+        );
+        eprintln!("allow_external_subcommands: {}", allow_external_subcommands);
+        add_execute_task_function(&mut module, &tasks_config);
+        add_show_help_for_task(&mut module, &tasks_config);
+    }
 
     args.debug = args.debug || cfg!(feature = "debug");
     
