@@ -3,10 +3,10 @@ use syn::{parse_macro_input, ItemMod};
 use quote::quote;
 use tusks_lib::TusksModule;
 use tusks_lib::AttributeCheck;
-use tusks_lib::AttributeValue;
 use tusks_lib::attribute::models::TusksAttr;
 use tusks_lib::tasks::functions::add_execute_task_function;
 use tusks_lib::tasks::functions::add_show_help_for_task;
+use tusks_lib::tasks::functions::add_use_staements;
 use tusks_lib::tasks::functions::set_allow_external_subcommands;
 
 #[proc_macro_attribute]
@@ -16,14 +16,11 @@ pub fn tusks(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let mut args = parse_macro_input!(_attr as TusksAttr);
 
+    add_use_staements(&mut module);
+
     // if tasks configuration exists add necessary functions
     if let Some(tasks_config) = &args.tasks {
         set_allow_external_subcommands(&mut module);
-        let allow_external_subcommands = module.get_attribute_bool(
-            "command",
-            "allow_external_subcommands"
-        );
-        eprintln!("allow_external_subcommands: {}", allow_external_subcommands);
         add_execute_task_function(&mut module, &tasks_config);
         add_show_help_for_task(&mut module, &tasks_config);
     }
