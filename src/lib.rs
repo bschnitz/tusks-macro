@@ -160,7 +160,7 @@ fn insert_internal_module(
         false => quote! {},
         true => quote! {
             pub fn exec_cli() -> Option<u8> {
-                use tusks::clap::Parser;
+                use ::tusks::clap::Parser;
 
                 let cli = cli::Cli::parse();
                 handle_matches(&cli)
